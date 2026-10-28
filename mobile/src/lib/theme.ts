@@ -1,0 +1,27 @@
+export const C = {
+  lapis: '#2346A0',
+  lapisDark: '#16306F',
+  lapisSoft: '#EEF2FA',
+  turq: '#19A097',
+  turqInk: '#0B6B65',
+  turqSoft: '#E3F2EF',
+  ink: '#14213D',
+  muted: '#5B6475',
+  line: '#E1E5EC',
+  lineStrong: '#D5DBE5',
+  bg: '#F4F6F8',
+  card: '#FFFFFF',
+  okBg: '#E3F2E8',
+  okInk: '#1D6B3A',
+  warnBg: '#FCEFD6',
+  warnInk: '#7A4F00',
+  grayBg: '#EEF0F4',
+  grayInk: '#3D4657',
+  danger: '#B42318',
+  tg: '#229ED9',
+  heart: '#D64545',
+  star: '#E3A008',
+  placeholder: '#C9D6EE',
+};
+
+export const R = { sm: 8, md: 10, lg: 14, xl: 18 };

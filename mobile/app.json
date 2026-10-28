@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "Uykor",
+    "slug": "uykor",
+    "version": "1.0.0",
+    "scheme": "uykor",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F4F6F8",
+    "primaryColor": "#2346A0",
+    "description": "Samarqanddagi yangi uylar xaritada, ijara, sotuv va ustalar. Maklersiz, komissiyasiz.",
+    "ios": {
+      "bundleIdentifier": "uz.uykor.app",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": ["tg", "tel"],
+        "CFBundleAllowMixedLocalizations": true
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "uz.uykor.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#2346A0",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "locales": {
+      "uz": "./locales/uz.json",
+      "ru": "./locales/ru.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-apple-authentication",
+      "expo-localization",
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "backgroundColor": "#2346A0"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "supabaseUrl": "https://upkbwcynhcuurczjvjqo.supabase.co",
+      "supabaseKey": "sb_publishable_Un86WzekyNITla3Td2azeQ_rJ54EXU5",
+      "site": "https://uykor.uz",
+      "eas": {}
+    }
+  }
+}
