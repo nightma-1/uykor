@@ -134,7 +134,8 @@ export default function Shaxmatka({ lang, complex, data }: Props) {
         <div>
           <h2 className="h2" id="shx-title">{t('Xonadon tanlash')}</h2>
           <span className="muted" style={{ fontSize: 14 }}>
-            {t('{n} ta xonadon sotuvda', { n: freeAll.length })}{minFree ? ` · ${t("{n} mln so'mdan", { n: mln(minFree) })}` : ''} · {t('holati quruvchi tomonidan yangilanadi')}
+            {t('{n} ta xonadon sotuvda', { n: freeAll.length })}{minFree ? ` · ${t("{n} mln so'mdan", { n: mln(minFree) })}` : ''}
+            {(rooms || onlyFree || maxPrice) ? <b style={{ color: 'var(--ink)' }}> · {t('{n} ta mos', { n: matches.length })}</b> : ` · ${t('holati quruvchi tomonidan yangilanadi')}`}
           </span>
         </div>
         <div className="seg shx-view" role="group" aria-label={t("Ko'rinish")}>
@@ -165,7 +166,6 @@ export default function Shaxmatka({ lang, complex, data }: Props) {
           </select>
         )}
         <label className="check"><input type="checkbox" checked={onlyFree} onChange={(e) => setOnlyFree(e.target.checked)} /> {t('Faqat sotuvdagilar')}</label>
-        {(rooms || onlyFree || maxPrice) ? <span className="muted num" style={{ fontSize: 13 }}>{t('{n} ta mos', { n: matches.length })}</span> : null}
       </div>
 
       <div className="shx-body">

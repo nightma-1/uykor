@@ -290,7 +290,7 @@ function buildSite(ctx: Ctx, blocks: Block[], apartments: Apartment[], isDimmed:
         const free = apts.filter((a) => a.status === 'sotuvda' && !isDimmed(a)).length;
         const sh = new THREE.Mesh(shellGeo, new THREE.MeshBasicMaterial({ color: free >= 2 ? STATUS_COLOR.sotuvda : free === 1 ? STATUS_COLOR.bron : '#8E979C', transparent: true, opacity: 0, depthWrite: false }));
         sh.position.y = (f - 0.5) * fh;
-        sh.userData = { kind: 'shell', blockId: b.id, floor: f, free, total: apts.length, heat: apts.length ? 0.16 : 0 };
+        sh.userData = { kind: 'shell', blockId: b.id, floor: f, free, total: apts.length, heat: 0 };
         g.add(sh);
         ctx.shells.push(sh);
       }
@@ -611,7 +611,17 @@ export default function Building3D(props: Props) {
     ctx.camera.position.set(r * 1.25, top * 0.9 + 12, r * 1.45);
     ctx.controls.target.set(0, top * 0.4, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.blocks, props.apartments, props.isDimmed]);
+  }, [props.blocks, props.apartments]);
+
+  // Filtr o'zgarsa bino qayta qurilmaydi: faqat qavatlardagi mos bo'sh xonadonlar soni yangilanadi.
+  useEffect(() => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    for (const sh of ctx.shells) {
+      const { blockId, floor } = sh.userData;
+      sh.userData.free = props.apartments.filter((a) => a.block_id === blockId && a.floor === floor && a.status === 'sotuvda' && !props.isDimmed(a)).length;
+    }
+  }, [props.isDimmed, props.apartments]);
 
   // Quyosh.
   useEffect(() => {
