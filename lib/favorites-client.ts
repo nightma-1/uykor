@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 
-export type FavType = 'majmua' | 'elon' | 'usta';
+export type FavType = 'majmua' | 'elon' | 'usta' | 'xonadon';
 
 export const sbBrowser = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 

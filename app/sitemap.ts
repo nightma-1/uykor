@@ -8,11 +8,12 @@ type Entry = { path: string; lastModified?: string; changeFrequency: 'daily' | '
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const sb = publicClient();
-  const [{ data: cx }, { data: devs }, { data: ls }, { data: ms }] = await Promise.all([
+  const [{ data: cx }, { data: devs }, { data: ls }, { data: ms }, { data: apts }] = await Promise.all([
     sb.from('complexes').select('slug, created_at').eq('published', true),
     sb.from('developers').select('slug, created_at'),
     sb.from('listings').select('id, updated_at').eq('status', 'faol').limit(5000),
     sb.from('masters').select('id, updated_at').eq('status', 'faol').limit(5000),
+    sb.from('apartments').select('id, updated_at, complex:complexes!inner(slug, published)').eq('status', 'sotuvda').eq('complex.published', true).limit(5000),
   ]);
   const entries: Entry[] = [
     { path: '/', changeFrequency: 'daily', priority: 1 },
@@ -26,6 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...(devs || []).map((d) => ({ path: `/quruvchi/${d.slug}`, lastModified: d.created_at, changeFrequency: 'monthly' as const, priority: 0.6 })),
     ...(ls || []).map((l) => ({ path: `/elon/${l.id}`, lastModified: l.updated_at, changeFrequency: 'weekly' as const, priority: 0.6 })),
     ...(ms || []).map((m) => ({ path: `/usta/${m.id}`, lastModified: m.updated_at, changeFrequency: 'weekly' as const, priority: 0.6 })),
+    ...((apts || []) as unknown as { id: string; updated_at: string; complex: { slug: string } }[]).map((a) => ({ path: `/jk/${a.complex.slug}/xonadon/${a.id}`, lastModified: a.updated_at, changeFrequency: 'weekly' as const, priority: 0.5 })),
   ];
   const url = (lang: 'uz' | 'ru', p: string) => (lang === 'uz' ? `${SITE}${p === '/' ? '' : p}` : `${SITE}/ru${p === '/' ? '' : p}`);
   return entries.flatMap((e) =>

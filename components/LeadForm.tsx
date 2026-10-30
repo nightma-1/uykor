@@ -8,7 +8,7 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_
   auth: { persistSession: false },
 });
 
-export default function LeadForm({ lang, complexId }: { lang: Lang; complexId: string }) {
+export default function LeadForm({ lang, complexId, apartmentId, idPrefix = 'lead' }: { lang: Lang; complexId: string; apartmentId?: string; idPrefix?: string }) {
   const t = T(lang);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+998 ');
@@ -21,7 +21,7 @@ export default function LeadForm({ lang, complexId }: { lang: Lang; complexId: s
     if (digits.length < 9) { setErr(t("Telefon raqamni to'liq yozing, masalan +998 90 123 45 67.")); return; }
     setErr('');
     setState('sending');
-    const { error } = await sb.from('leads').insert({ complex_id: complexId, name: name.trim(), phone: phone.trim(), kind });
+    const { error } = await sb.from('leads').insert({ complex_id: complexId, apartment_id: apartmentId ?? null, name: name.trim(), phone: phone.trim(), kind });
     if (error) { setState('error'); setErr(t("Ariza yuborilmadi. Internetni tekshirib, qayta urinib ko'ring.")); return; }
     setState('done');
   }
@@ -33,12 +33,12 @@ export default function LeadForm({ lang, complexId }: { lang: Lang; complexId: s
   return (
     <form onSubmit={(e) => { e.preventDefault(); send('korish'); }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="field">
-        <label htmlFor="lead-name" style={{ textTransform: 'none', fontSize: 13, color: 'var(--ink)' }}>{t('Ismingiz')}</label>
-        <input id="lead-name" className="input" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+        <label htmlFor={`${idPrefix}-name`} style={{ textTransform: 'none', fontSize: 13, color: 'var(--ink)' }}>{t('Ismingiz')}</label>
+        <input id={`${idPrefix}-name`} className="input" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="field">
-        <label htmlFor="lead-phone" style={{ textTransform: 'none', fontSize: 13, color: 'var(--ink)' }}>{t('Telefon raqam')}</label>
-        <input id="lead-phone" className="input" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <label htmlFor={`${idPrefix}-phone`} style={{ textTransform: 'none', fontSize: 13, color: 'var(--ink)' }}>{t('Telefon raqam')}</label>
+        <input id={`${idPrefix}-phone`} className="input" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
       {err && <span className="error" role="alert">{err}</span>}
       <button type="submit" className="btn" disabled={state === 'sending'} style={{ minHeight: 48 }}>

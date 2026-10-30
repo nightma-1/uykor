@@ -1,8 +1,9 @@
 import { RU as RU1 } from './i18n-ru';
 import { RU2 } from './i18n-ru2';
 import { RU3 } from './i18n-ru3';
+import { RU4 } from './i18n-ru4';
 
-const RU: Record<string, string> = { ...RU1, ...RU2, ...RU3 };
+const RU: Record<string, string> = { ...RU1, ...RU2, ...RU3, ...RU4 };
 
 export type Lang = 'uz' | 'ru';
 export const LANGS: Lang[] = ['uz', 'ru'];

@@ -33,15 +33,18 @@ export default async function Favorites({ searchParams }: { searchParams: Promis
     sb.rpc('my_telegram'),
   ]);
   const ids = (type: string) => (favs || []).filter((f) => f.item_type === type).map((f) => f.item_id);
-  const [cx, ls, ms] = await Promise.all([
+  const [cx, ls, ms, ap] = await Promise.all([
     ids('majmua').length ? sb.from('complexes').select('id, slug, name, district, price_m2, cover_url').in('id', ids('majmua')).eq('published', true) : Promise.resolve({ data: [] }),
     ids('elon').length ? sb.from('listings').select(`${LISTING_COLS}, listing_photos(id, url, sort)`).in('id', ids('elon')).eq('status', 'faol') : Promise.resolve({ data: [] }),
     ids('usta').length ? sb.from('master_stats').select(MASTER_COLS).in('id', ids('usta')).eq('status', 'faol') : Promise.resolve({ data: [] }),
+    ids('xonadon').length ? sb.from('apartments').select('id, number, floor, rooms, area, status, price, complex:complexes(slug, name, price_m2, published)').in('id', ids('xonadon')) : Promise.resolve({ data: [] }),
   ]);
+  type FavApt = { id: string; number: string; floor: number; rooms: number; area: number; status: string; price: number | null; complex: { slug: string; name: string; price_m2: number; published: boolean } | null };
+  const apts = ((ap.data || []) as unknown as FavApt[]).filter((a) => a.complex?.published);
   const complexes = (cx.data || []) as { id: string; slug: string; name: string; district: string; price_m2: number; cover_url: string | null }[];
   const listings = (ls.data || []) as ListingWithPhotos[];
   const masters = (ms.data || []) as MasterStats[];
-  const total = complexes.length + listings.length + masters.length;
+  const total = complexes.length + listings.length + masters.length + apts.length;
   const tgName = tg as string | null;
 
   // Prefill from the "notify me" links on listing pages.
@@ -135,6 +138,19 @@ export default async function Favorites({ searchParams }: { searchParams: Promis
                 </div>
               </Link>
               {rm('majmua', c.id)}
+            </div>
+          ))}
+          {apts.map((a) => (
+            <div key={a.id} className="card fav-row">
+              <Link href={lp(lang, `/jk/${a.complex!.slug}/xonadon/${a.id}`)} className="fav-link">
+                <div className="fav-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>№ {a.number}</div>
+                <div style={{ minWidth: 0 }}>
+                  <strong>{a.complex!.name}: {t('{n} xonali', { n: a.rooms })}, {Number(a.area)} m²</strong>
+                  <div className="muted" style={{ fontSize: 13 }}>{t('Xonadon')} · {t('{n}-qavat', { n: a.floor })} · {t(a.status === 'sotuvda' ? 'Sotuvda' : a.status === 'bron' ? 'Bron' : a.status === 'sotilgan' ? 'Sotilgan' : 'Sotuvda emas')}</div>
+                  <div className="num" style={{ fontWeight: 700 }}>{t("{n} mln so'm", { n: mln(a.price ?? Number(a.area) * a.complex!.price_m2, 1) })}</div>
+                </div>
+              </Link>
+              {rm('xonadon', a.id)}
             </div>
           ))}
           {listings.map((l) => (

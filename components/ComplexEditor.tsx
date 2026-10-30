@@ -120,6 +120,14 @@ export default function ComplexEditor({ mode, lang, c, devs, actions, userId }: 
 
       {c && (
         <>
+          <section className="card section" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderColor: 'var(--lapis)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 300px' }}>
+              <h2 className="h2">{t('Xonadonlar va 3D (shaxmatka)')}</h2>
+              <span className="muted" style={{ fontSize: 14 }}>{t("Bloklar, qavat planirovkalari, har bir xonadon holati va narxi. Saytda fasad, 3D bino va xonadon tanlash shulardan quriladi.")}</span>
+            </div>
+            <Link href={admin ? `/admin/majmualar/${c.id}/xonadonlar` : `/kabinet/quruvchi/majmua/${c.id}/xonadonlar`} className="btn">{t('Shaxmatkani ochish')}</Link>
+          </section>
+
           <section className="card section">
             <h2 className="h2">{t('Xonadon turlari')}</h2>
             <div className="table-wrap">

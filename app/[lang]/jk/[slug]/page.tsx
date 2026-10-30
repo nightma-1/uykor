@@ -9,6 +9,8 @@ import FavoriteButton from '@/components/FavoriteButton';
 import MiniMap from '@/components/MiniMap';
 import PhoneReveal from '@/components/PhoneReveal';
 import { getComplex } from '@/lib/data';
+import { getShaxmatka } from '@/lib/shaxmatka-data';
+import Shaxmatka from '@/components/shaxmatka/Shaxmatka';
 import { delayMonths, dueLabel, minPrice, mln, monthYear, quarter, som } from '@/lib/format';
 import { alternates, langFrom, loc, lp, T, type Lang } from '@/lib/i18n';
 import type { UnitType } from '@/lib/types';
@@ -62,9 +64,12 @@ export default async function JkPage({ params }: Params) {
   const data = await getComplex(slug);
   if (!data) notFound();
   const { complex: c, developer: d, history } = data;
+  const shx = await getShaxmatka(c.id);
+  const hasShx = shx.blocks.length > 0 && shx.apartments.length > 0;
+  const freeApts = shx.apartments.filter((a) => a.status === 'sotuvda');
   const units = c.unit_types as UnitType[];
   const roomsList = units.map((u) => u.rooms);
-  const from = minPrice(c);
+  const from = freeApts.length ? Math.min(...freeApts.map((a) => a.price ?? a.area * c.price_m2)) : minPrice(c);
   const description = loc(c, 'description', lang);
 
   return (
@@ -111,6 +116,14 @@ export default async function JkPage({ params }: Params) {
               <div><span className="eyebrow">{t('Topshirish')}</span><span className="v">{dueLabel(c, lang)}</span>{c.status === 'topshirilgan' && c.delivered_date && <span className="muted" style={{ fontSize: 12 }}>{monthYear(c.delivered_date, lang)}</span>}</div>
               <div><span className="eyebrow">{t('Kadastr')}</span><span className="v">{c.kadastr_status === 'bor' ? t('Chiqqan') : t('Jarayonda')}</span>{d?.avg_kadastr_months && c.kadastr_status !== 'bor' ? <span className="muted" style={{ fontSize: 12 }}>{t("quruvchida o'rtacha ~{n} oy", { n: d.avg_kadastr_months })}</span> : null}</div>
             </section>
+
+            {hasShx && (
+              <Shaxmatka
+                lang={lang}
+                data={shx}
+                complex={{ id: c.id, slug: c.slug, name: c.name, lat: c.lat, lng: c.lng, price_m2: c.price_m2, installment_months: c.installment_months, first_payment_pct: c.first_payment_pct }}
+              />
+            )}
 
             {c.status === 'qurilmoqda' && (
               <section className="card section">
@@ -202,6 +215,9 @@ export default async function JkPage({ params }: Params) {
                 <div className="muted" style={{ fontSize: 13 }}>{t('Narxi')}</div>
                 <div className="num" style={{ fontSize: 26, fontWeight: 700 }}>{t("{n} mln so'mdan", { n: mln(from) })}</div>
               </div>
+              {hasShx && (
+                <a href="#xonadonlar" className="btn" style={{ minHeight: 48 }}>{t('Xonadon tanlash · {n} ta sotuvda', { n: freeApts.length })}</a>
+              )}
               <LeadForm lang={lang} complexId={c.id} />
               <div className="or-line"><span>{t("yoki to'g'ridan-to'g'ri qo'ng'iroq qiling")}</span></div>
               <PhoneReveal lang={lang} kind="quruvchi" id={d.id} hours={d} label={t("Sotuv bo'limi telefoni")} />
