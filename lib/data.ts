@@ -11,10 +11,13 @@ export async function getDevelopers(): Promise<Developer[]> {
 
 export async function getComplexes(): Promise<ComplexWithDev[]> {
   const sb = publicClient();
-  const [{ data: cx, error }, devs] = await Promise.all([
+  const [{ data: cx, error }, devs, { data: shx }] = await Promise.all([
     sb.from('complexes').select('*, unit_types(*)').eq('published', true),
     getDevelopers(),
+    sb.from('apartments').select('complex_id, status').limit(20000),
   ]);
+  const free = new Map<string, number>();
+  for (const a of shx || []) free.set(a.complex_id, (free.get(a.complex_id) ?? 0) + (a.status === 'sotuvda' ? 1 : 0));
   if (error) throw new Error(error.message);
   const byId = new Map(devs.map((d) => [d.id, d]));
   return ((cx || []) as (Complex & { unit_types: UnitType[] })[])
@@ -23,6 +26,7 @@ export async function getComplexes(): Promise<ComplexWithDev[]> {
       return {
         ...c,
         unit_types: [...(c.unit_types || [])].sort((a, b) => a.rooms - b.rooms),
+        shx_free: free.has(c.id) ? free.get(c.id)! : null,
         developer: { slug: d?.slug ?? '', name: d?.name ?? '', initials: d?.initials ?? '', rating: d?.rating ?? 0 },
       };
     })

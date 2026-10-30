@@ -15,7 +15,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const t = T(lang);
   const { sb, user } = await requireAdmin();
   const [{ data: leads }, { count: sampleCount }] = await Promise.all([
-    sb.from('leads').select('*, complex:complexes(name, slug)').order('created_at', { ascending: false }).limit(200),
+    sb.from('leads').select('*, complex:complexes(name, slug), apartment:apartments(number, floor, rooms, area, block:complex_blocks(name))').order('created_at', { ascending: false }).limit(200),
     sb.from('complexes').select('id', { count: 'exact', head: true }).eq('is_sample', true),
   ]);
   const fresh = (leads || []).filter((l) => l.status === 'yangi').length;
@@ -38,7 +38,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                 <td className="muted">{new Date(l.created_at).toLocaleString(locale(lang), { timeZone: 'Asia/Samarkand', dateStyle: 'short', timeStyle: 'short' })}</td>
                 <td style={{ fontWeight: 600 }}>{l.name}</td>
                 <td style={{ userSelect: 'all' }}>{l.phone}</td>
-                <td>{l.complex?.name ?? '—'}</td>
+                <td>{l.complex?.name ?? '—'}{l.apartment && <div className="muted" style={{ fontSize: 12 }}>{l.apartment.block?.name ? `${l.apartment.block.name} blok · ` : ''}{t('{n}-qavat', { n: l.apartment.floor })} · № {l.apartment.number} · {l.apartment.rooms}x, {Number(l.apartment.area)} m²</div>}</td>
                 <td>{l.kind === 'qongiroq' ? t("Qo'ng'iroq") : t("Ko'rish")}</td>
                 <td>
                   <form action={setLeadStatus} style={{ display: 'flex', gap: 6 }}>

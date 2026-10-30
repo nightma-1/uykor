@@ -67,4 +67,6 @@ export type Complex = {
 export type ComplexWithDev = Complex & {
   developer: Pick<Developer, 'slug' | 'name' | 'initials' | 'rating'>;
   unit_types: UnitType[];
+  /** Shaxmatka bo'lsa — sotuvdagi xonadonlar soni (3D tanlash bor). */
+  shx_free?: number | null;
 };

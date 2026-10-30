@@ -93,9 +93,11 @@ export default async function DeveloperCabinet({ searchParams }: { searchParams:
   const devIds = devs.map((d) => d.id);
   const { data: complexes } = await sb.from('complexes').select('id, name, slug, district, price_m2, published, progress, developer_id').in('developer_id', devIds).order('created_at', { ascending: false });
   const cids = (complexes || []).map((c) => c.id);
-  const { data: leads } = cids.length
-    ? await sb.from('leads').select('id, name, phone, kind, status, created_at, complex_id').in('complex_id', cids).order('created_at', { ascending: false }).limit(100)
-    : { data: [] as { id: string; name: string; phone: string; kind: string; status: string; created_at: string; complex_id: string }[] };
+  type LeadRow = { id: string; name: string; phone: string; kind: string; status: string; created_at: string; complex_id: string; apartment: { number: string; floor: number; rooms: number; area: number; block: { name: string } | null } | null };
+  const { data: leadsRaw } = cids.length
+    ? await sb.from('leads').select('id, name, phone, kind, status, created_at, complex_id, apartment:apartments(number, floor, rooms, area, block:complex_blocks(name))').in('complex_id', cids).order('created_at', { ascending: false }).limit(100)
+    : { data: [] };
+  const leads = (leadsRaw || []) as unknown as LeadRow[];
   const cname = Object.fromEntries((complexes || []).map((c) => [c.id, c.name]));
   const fresh = (leads || []).filter((l) => l.status === 'yangi').length;
 
@@ -127,7 +129,7 @@ export default async function DeveloperCabinet({ searchParams }: { searchParams:
                     <td className="muted">{new Date(l.created_at).toLocaleString(locale(lang), { timeZone: 'Asia/Samarkand', dateStyle: 'short', timeStyle: 'short' })}</td>
                     <td style={{ fontWeight: 600 }}>{l.name}</td>
                     <td><a href={`tel:${l.phone.replace(/[^\d+]/g, '')}`} style={{ userSelect: 'all' }}>{l.phone}</a></td>
-                    <td>{cname[l.complex_id] ?? '—'}</td>
+                    <td>{cname[l.complex_id] ?? '—'}{l.apartment && <div className="muted" style={{ fontSize: 12 }}>{l.apartment.block?.name ? `${l.apartment.block.name} blok · ` : ''}{t('{n}-qavat', { n: l.apartment.floor })} · № {l.apartment.number} · {l.apartment.rooms}x, {Number(l.apartment.area)} m²</div>}</td>
                     <td>{l.kind === 'qongiroq' ? t("Qo'ng'iroq") : t("Ko'rish")}</td>
                     <td>
                       <form action={setLeadStatus} style={{ display: 'flex', gap: 6 }}>

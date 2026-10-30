@@ -8,7 +8,8 @@ import {
   autoLayout, autoRooms, bbox, centroid, COMPASS, COMPASS_UZ, polyArea, round1, round2, STATUS_COLOR, STATUS_INK, windowLabels,
   type Apartment, type AptStatus, type Block, type FloorPlan, type Pt, type Shaxmatka, type UnitDef,
 } from '@/lib/shaxmatka';
-import { deleteBlock, deletePlan, loadShaxmatka, saveBlock, savePlan, updateApartments } from '@/lib/shaxmatka-actions';
+import { deleteBlock, deletePlan, importShaxmatka, loadShaxmatka, saveBlock, savePlan, updateApartments } from '@/lib/shaxmatka-actions';
+import { parseImport, type ImportRow } from '@/lib/shaxmatka';
 import FacadeView from './FacadeView';
 import { statusText } from './FloorPlanSvg';
 import '@/app/shaxmatka.css';
@@ -116,6 +117,25 @@ export default function ShaxmatkaEditor({ lang, mode, complex, initial, userId }
       </div>
       {msg && <div className={msg.ok ? 'success' : 'error'} role={msg.ok ? 'status' : 'alert'}>{msg.text}</div>}
 
+      <ImportPanel
+        t={t}
+        hasData={data.apartments.length > 0}
+        onImport={async (m, rows) => {
+          setBusy(true);
+          const r = await importShaxmatka(complex.id, m, rows);
+          setBusy(false);
+          if (!r.ok) { flash(false, r.error); return false; }
+          await reload();
+          const d = await loadShaxmatka(complex.id);
+          if (d?.blocks[0]) { setDraftBlock(null); setBlockId(d.blocks[0].id); }
+          flash(true, m === 'build'
+            ? t('Tayyor: {b} ta blok, {n} ta xonadon yaratildi', { b: r.blocks, n: r.apartments })
+            : t("Yangilandi: {n} ta xonadon{s}", { n: r.apartments, s: r.skipped ? t(', {k} tasi topilmadi', { k: r.skipped }) : '' }));
+          return true;
+        }}
+        busy={busy}
+      />
+
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {data.blocks.map((b) => (
           <button key={b.id} type="button" className="shx-tag" aria-pressed={!draftBlock && b.id === block?.id} onClick={() => { setDraftBlock(null); setBlockId(b.id); setPlanDraft(null); }}>
@@ -179,6 +199,123 @@ export default function ShaxmatkaEditor({ lang, mode, complex, initial, userId }
         <ChessGrid t={t} block={block} apartments={apts} priceM2={complex.price_m2} onChanged={reload} flash={flash} />
       )}
     </div>
+  );
+}
+
+// ---------- Excel import ----------
+
+function parseCsv(text: string): string[][] {
+  const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim());
+  const sep = (lines[0].match(/;/g) || []).length >= (lines[0].match(/,/g) || []).length ? ';' : lines[0].includes('\t') ? '\t' : ',';
+  return lines.map((l) => {
+    const out: string[] = [];
+    let cur = '', q = false;
+    for (const ch of l) {
+      if (ch === '"') q = !q;
+      else if (ch === sep && !q) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map((c) => c.trim());
+  });
+}
+
+const TEMPLATE = [
+  'Blok;Qavat;Raqam;Xonalar;Maydon;Narx;Holat',
+  'A;2;1;1;42,5;380000000;sotuvda',
+  'A;2;2;2;64,8;575000000;bron',
+  'A;2;3;3;86,3;760000000;sotilgan',
+  'A;3;4;1;42,5;383000000;sotuvda',
+].join('\n');
+
+function ImportPanel({ t, hasData, busy, onImport }: { t: ReturnType<typeof T>; hasData: boolean; busy: boolean; onImport: (m: 'build' | 'update', rows: ImportRow[]) => Promise<boolean> }) {
+  const [open, setOpen] = useState(!hasData);
+  const [parsed, setParsed] = useState<{ name: string; rows: ImportRow[]; errors: string[] } | null>(null);
+  const [state, setState] = useState<'idle' | 'reading' | 'error'>('idle');
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setState('reading');
+    try {
+      let table: unknown[][];
+      if (/\.(csv|txt)$/i.test(f.name)) table = parseCsv(await f.text());
+      else {
+        const { default: readXlsxFile } = await import('read-excel-file');
+        table = (await readXlsxFile(f)) as unknown[][];
+      }
+      const r = parseImport(table);
+      setParsed({ name: f.name, rows: r.rows, errors: r.errors });
+      setState('idle');
+    } catch {
+      setState('error');
+    }
+  }
+
+  const blocks = parsed ? [...new Set(parsed.rows.map((r) => r.block))] : [];
+  const floors = parsed ? [...new Set(parsed.rows.map((r) => r.floor))] : [];
+
+  return (
+    <section className="card section" style={{ gap: 12, borderColor: 'var(--lapis)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div>
+          <h2 className="h2">{t('Excel dan bir bosishda')}</h2>
+          <span className="muted" style={{ fontSize: 14 }}>{t("Loyiha institutining eksplikatsiyasi yoki sotuv bo'limi jadvali: bino, qavatlar, xonadonlar, narx va holat avtomatik quriladi.")}</span>
+        </div>
+        <button type="button" className="btn ghost small" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? t('Yopish') : t('Ochish')}</button>
+      </div>
+      {open && (
+        <>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label className="btn" style={{ cursor: 'pointer' }}>
+              {state === 'reading' ? t("O'qilmoqda…") : t('Excel yoki CSV tanlash')}
+              <input type="file" accept=".xlsx,.csv,.txt" onChange={pick} style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} />
+            </label>
+            <a className="btn ghost small" download="uykor-shaxmatka-namuna.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent('﻿' + TEMPLATE)}`}>{t('Namuna jadval')}</a>
+            <span className="muted" style={{ fontSize: 12 }}>{t('Ustunlar: Blok, Qavat, Raqam, Xonalar, Maydon, Narx, Holat (ruscha nomlar ham tushuniladi).')}</span>
+          </div>
+          {state === 'error' && <div className="error">{t("Faylni o'qib bo'lmadi. .xlsx yoki .csv bo'lsin.")}</div>}
+          {parsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className={parsed.rows.length ? 'notice' : 'error'}>
+                <span>
+                  <b>{parsed.name}</b>: {t('{n} ta xonadon, {b} ta blok ({names}), qavatlar {f0}–{f1}', {
+                    n: parsed.rows.length, b: blocks.length, names: blocks.join(', '),
+                    f0: floors.length ? Math.min(...floors) : 0, f1: floors.length ? Math.max(...floors) : 0,
+                  })}
+                  {parsed.errors.length > 0 && <><br />{parsed.errors.slice(0, 5).map((e) => t(e)).join(' · ')}{parsed.errors.length > 5 ? ' …' : ''}</>}
+                </span>
+              </div>
+              {parsed.rows.length > 0 && (
+                <div className="table-wrap">
+                  <table className="t num" style={{ fontSize: 13 }}>
+                    <thead><tr><th>{t('Blok')}</th><th>{t('Qavat')}</th><th>№</th><th>{t('Xonalar')}</th><th>{t('Maydon')}</th><th>{t('Narx')}</th><th>{t('Holati')}</th></tr></thead>
+                    <tbody>
+                      {parsed.rows.slice(0, 6).map((r) => (
+                        <tr key={r.line}><td>{r.block}</td><td>{r.floor}</td><td>{r.number || '—'}</td><td>{r.rooms}</td><td>{r.area}</td><td>{r.price ? mln(r.price, 1) : '—'}</td><td>{r.status ? t(statusText(r.status)) : '—'}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button type="button" className="btn" disabled={busy || !parsed.rows.length} onClick={async () => {
+                  if (hasData && !window.confirm(t("Jadvaldagi bloklar qaytadan quriladi: ularning planirovkalari va xonadonlari almashtiriladi. Davom etamizmi?"))) return;
+                  if (await onImport('build', parsed.rows)) setParsed(null);
+                }}>{busy ? t('Saqlanmoqda…') : t('Binoni jadvaldan qurish')}</button>
+                {hasData && (
+                  <button type="button" className="btn ghost" disabled={busy || !parsed.rows.length} onClick={async () => { if (await onImport('update', parsed.rows)) setParsed(null); }}>
+                    {t('Faqat narx va holatni yangilash')}
+                  </button>
+                )}
+              </div>
+              <span className="muted" style={{ fontSize: 12 }}>{t("Planirovka qavatdagi xonadonlar maydoniga qarab avtomatik chiziladi. Haqiqiy chizmani keyin pastda rasm ustidan tuzatish mumkin.")}</span>
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

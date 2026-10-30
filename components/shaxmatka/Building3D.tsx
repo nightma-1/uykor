@@ -768,10 +768,40 @@ export default function Building3D(props: Props) {
       lamp.position.set(lx, y0 + H - 0.35, lz);
       inner.add(lamp);
     }
+    // Kirish eshigidan bir oz ichkarida, xonadon ichiga qarab turamiz.
     const hall = rooms.find((r) => /dahliz/i.test(r.name)) ?? rooms[0];
-    const [sx, sz] = L(centroid(hall.poly), W, D);
+    let [sx, sz] = L(centroid(hall.poly), W, D);
     const [ux, uz] = L(centroid(u.poly), W, D);
-    const yaw = Math.atan2(-(ux - sx), -(uz - sz));
+    let yaw = Math.atan2(-(ux - sx), -(uz - sz));
+    const door = unitWalls(u, W, D).flatMap((w) => w.openings.filter((o) => o.kind === 'entrance').map((o) => ({ w, o })))[0];
+    if (door) {
+      const [ax, az] = L(door.w.a, W, D);
+      const [bx, bz] = L(door.w.b, W, D);
+      const len = Math.hypot(bx - ax, bz - az) || 1;
+      const dx = (bx - ax) / len, dz = (bz - az) / len;
+      const mid = (door.o.t0 + door.o.t1) / 2;
+      const px = ax + dx * mid, pz = az + dz * mid;
+      // Normal — xonadon markaziga qaragan tomon.
+      let nx = -dz, nz = dx;
+      if ((ux - px) * nx + (uz - pz) * nz < 0) { nx = -nx; nz = -nz; }
+      sx = px + nx * 0.9; sz = pz + nz * 0.9;
+      yaw = Math.atan2(-nx, -nz);
+      // Dahlizdan eng katta xonaga ochiladigan eshik tomonga qaraymiz (devorga emas).
+      const hi = rooms.indexOf(hall);
+      const inner = unitWalls(u, W, D)
+        .filter((w) => w.rooms && w.rooms.includes(hi) && w.openings.some((o) => o.kind === 'door' || o.kind === 'arch'))
+        .map((w) => ({ w, other: rooms[w.rooms![0] === hi ? w.rooms![1] : w.rooms![0]] }))
+        .sort((p, q) => polyArea(q.other.poly) - polyArea(p.other.poly))[0];
+      if (inner) {
+        const o = inner.w.openings.find((x) => x.kind === 'door' || x.kind === 'arch')!;
+        const [qa, qz] = L(inner.w.a, W, D);
+        const [qb, qbz] = L(inner.w.b, W, D);
+        const ql = Math.hypot(qb - qa, qbz - qz) || 1;
+        const m = (o.t0 + o.t1) / 2;
+        const tx = qa + ((qb - qa) / ql) * m, tz = qz + ((qbz - qz) / ql) * m;
+        yaw = Math.atan2(-(tx - sx), -(tz - sz));
+      }
+    }
     ctx.walk = { group: g, x: sx, z: sz, y: y0, yaw, pitch: -0.05, segs, W, D };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.mode, props.selBlock, props.selFloor, props.selApt, props.plans, props.apartments, props.blocks, props.isDimmed]);

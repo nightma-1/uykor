@@ -1,6 +1,6 @@
 'use client';
 
-import { centroid, corridorRect, STATUS_COLOR, STATUS_INK, type Apartment, type Block, type FloorPlan } from '@/lib/shaxmatka';
+import { bbox, centroid, corridorRect, STATUS_COLOR, STATUS_INK, type Apartment, type Block, type FloorPlan } from '@/lib/shaxmatka';
 import type { TFn } from '@/lib/i18n';
 
 type Props = {
@@ -23,12 +23,19 @@ export default function FloorPlanSvg({ t, block, plan, apartments, selected, isD
   const D = block.depth_m;
   const pad = Math.max(W, D) * 0.07;
   const cor = corridorRect(plan.units, W, D);
-  const fs = Math.max(W, D) / (compact ? 30 : 36);
+  // Bitta xonadon ko'rsatilganda ko'rinish shu xonadonga yaqinlashtiriladi.
+  const fu = focusKey && !walker ? plan.units.find((u) => u.key === focusKey) : undefined;
+  const fb = fu ? bbox(fu.poly) : null;
+  const span = fb ? Math.max(fb.x1 - fb.x0, fb.y1 - fb.y0) : Math.max(W, D);
+  const fs = span / (fb ? 22 : compact ? 30 : 36);
+  const vb = fb
+    ? `${fb.x0 - span * 0.08} ${fb.y0 - span * 0.08} ${fb.x1 - fb.x0 + span * 0.16} ${fb.y1 - fb.y0 + span * 0.16}`
+    : `${-pad} ${-pad} ${W + pad * 2} ${D + pad * 2}`;
   const byKey = new Map(apartments.map((a) => [a.unit_key, a]));
   const north = -block.rotation_deg;
 
   return (
-    <svg viewBox={`${-pad} ${-pad} ${W + pad * 2} ${D + pad * 2}`} className="shx-plan" role="img" aria-label={t('Qavat planirovkasi')}>
+    <svg viewBox={vb} className="shx-plan" role="img" aria-label={t('Qavat planirovkasi')}>
       <rect x={-pad / 2} y={-pad / 2} width={W + pad} height={D + pad} rx={pad / 3} fill="var(--card)" stroke="var(--line-strong)" strokeWidth={fs * 0.08} />
       {plan.image_url && <image href={plan.image_url} x={0} y={0} width={W} height={D} preserveAspectRatio="none" opacity={0.9} />}
       {cor && !plan.image_url && (
@@ -90,7 +97,7 @@ export default function FloorPlanSvg({ t, block, plan, apartments, selected, isD
           <circle r={fs * 0.55} fill="var(--lapis)" stroke="#FFFFFF" strokeWidth={fs * 0.15} />
         </g>
       )}
-      <g transform={`translate(${W + pad * 0.5} ${pad * 0.2}) rotate(${north})`} aria-hidden="true">
+      <g transform={`translate(${fb ? fb.x1 + span * 0.04 : W + pad * 0.5} ${fb ? fb.y0 + span * 0.02 : pad * 0.2}) rotate(${north})`} aria-hidden="true">
         <path d={`M0 ${-fs * 1.1} L${fs * 0.5} ${fs * 0.6} L0 ${fs * 0.25} L${-fs * 0.5} ${fs * 0.6} Z`} fill="var(--ink)" />
         <text y={-fs * 1.4} fontSize={fs * 0.7} textAnchor="middle" fill="var(--ink)" transform={`rotate(${-north} 0 ${-fs * 1.6})`}>{t('Sh.')}</text>
       </g>

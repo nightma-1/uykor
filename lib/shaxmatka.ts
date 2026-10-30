@@ -251,22 +251,28 @@ export function autoRooms(x0: number, y0: number, x1: number, y1: number, rooms:
 }
 
 /** Tipik qavat: o'rtada yo'lak, ikki qator xonadon. mix — xonalar soni ketma-ketligi. */
-export function autoLayout(W: number, D: number, mix: number[], corridor = 1.8): UnitDef[] {
-  const top = mix.slice(0, Math.ceil(mix.length / 2));
-  const bottom = mix.slice(Math.ceil(mix.length / 2));
+export function autoLayout(W: number, D: number, mix: number[], corridor = 1.8, areas?: number[]): UnitDef[] {
+  // Har xonadon indeksi bilan: maydon berilsa kenglik maydonga mutanosib bo'ladi.
+  const idx = mix.map((_, i) => i);
+  const half = Math.ceil(mix.length / 2);
+  const top = idx.slice(0, half);
+  const bottom = idx.slice(half);
   const cy0 = D / 2 - corridor / 2;
   const cy1 = D / 2 + corridor / 2;
-  const weight = (r: number) => 0.7 + r * 0.55;
-  const units: UnitDef[] = [];
-  let k = 0;
+  const weight = (i: number) => (areas && areas[i] > 0 ? areas[i] : 0.7 + mix[i] * 0.55);
+  const units: UnitDef[] = new Array(mix.length);
   const row = (list: number[], ya: number, yb: number, side: 'top' | 'bottom') => {
-    const tot = list.reduce((s, r) => s + weight(r), 0);
+    const tot = list.reduce((s, i) => s + weight(i), 0);
     let x = 0;
-    list.forEach((r, i) => {
-      const nx = i === list.length - 1 ? W : round2(x + (W * weight(r)) / tot);
+    list.forEach((i, j) => {
+      const nx = j === list.length - 1 ? W : round2(x + (W * weight(i)) / tot);
       const poly = rectPoly(x, ya, nx, yb);
-      const rooms_detail = autoRooms(x, ya, nx, yb, r, side);
-      units.push({ key: String.fromCharCode(65 + k++), rooms: r, area: round1(polyArea(poly)), poly, rooms_detail });
+      let rooms_detail = autoRooms(x, ya, nx, yb, mix[i], side);
+      const geo = polyArea(poly);
+      const area = areas && areas[i] > 0 ? round1(areas[i]) : round1(geo);
+      // Haqiqiy maydon berilganda xonalar maydonini shunga moslaymiz.
+      if (areas && areas[i] > 0) rooms_detail = rooms_detail.map((r) => ({ ...r, area: round1((r.area * area) / geo) }));
+      units[i] = { key: unitKey(i), rooms: mix[i], area, poly, rooms_detail };
       x = nx;
     });
   };
@@ -274,6 +280,8 @@ export function autoLayout(W: number, D: number, mix: number[], corridor = 1.8):
   row([...bottom].reverse(), cy1, D, 'top');
   return units;
 }
+
+export const unitKey = (i: number) => (i < 26 ? String.fromCharCode(65 + i) : `U${i}`);
 
 /** Yo'lak: xonadonlar egallamagan qism (2D va 3D da yo'lak sifatida chiziladi). */
 export function corridorRect(units: UnitDef[], W: number, D: number): [number, number, number, number] | null {
@@ -304,4 +312,71 @@ export function cleanUnits(raw: unknown): UnitDef[] {
       : [];
     return [{ key, rooms, area, poly: pg, windows, rooms_detail }];
   });
+}
+
+// ---------- Excel / CSV import ----------
+
+export type ImportRow = { block: string; floor: number; number: string; rooms: number; area: number; price: number | null; status: AptStatus | null; line: number };
+
+const HEAD: Record<keyof Omit<ImportRow, 'line'>, RegExp> = {
+  block: /^(blok|блок|подъезд|секция|korpus|корпус|block)/i,
+  floor: /^(qavat|этаж|floor)/i,
+  number: /^(raqam|№|номер|kvartira|квартира|xonadon|number|no\.?$)/i,
+  rooms: /^(xona|комн|rooms|кол.*комн)/i,
+  area: /^(maydon|площ|area|m2|м2|m²|м²)/i,
+  price: /^(narx|цена|стоим|price)/i,
+  status: /^(holat|статус|status|состояние)/i,
+};
+
+export function parseStatus(v: unknown): AptStatus | null {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s) return null;
+  if (/sotilgan|продан|sold|^прод/.test(s)) return 'sotilgan';
+  if (/bron|брон|резерв|reserv/.test(s)) return 'bron';
+  if (/yopiq|не продаж|закрыт|closed|sotuvda emas/.test(s)) return 'yopiq';
+  return 'sotuvda';
+}
+
+const toNum = (v: unknown) => {
+  if (typeof v === 'number') return v;
+  const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.').replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(n) ? n : NaN;
+};
+
+/** Jadvalni (birinchi qator — sarlavha) xonadon qatorlariga aylantiradi. */
+export function parseImport(table: unknown[][]): { rows: ImportRow[]; errors: string[]; columns: string[] } {
+  const errors: string[] = [];
+  const hi = table.findIndex((r) => r && r.filter((c) => c !== null && String(c).trim() !== '').length >= 3);
+  if (hi < 0) return { rows: [], errors: ['Jadval bo\'sh'], columns: [] };
+  const header = table[hi].map((c) => String(c ?? '').trim());
+  const col: Partial<Record<keyof typeof HEAD, number>> = {};
+  for (const k of Object.keys(HEAD) as (keyof typeof HEAD)[]) {
+    const i = header.findIndex((h) => HEAD[k].test(h));
+    if (i >= 0) col[k] = i;
+  }
+  const columns = (Object.keys(col) as string[]);
+  for (const need of ['floor', 'rooms', 'area'] as const) if (col[need] === undefined) errors.push(`Ustun topilmadi: ${need === 'floor' ? 'qavat' : need === 'rooms' ? 'xonalar' : 'maydon'}`);
+  if (errors.length) return { rows: [], errors, columns };
+  const rows: ImportRow[] = [];
+  for (let r = hi + 1; r < table.length && rows.length < 3000; r++) {
+    const row = table[r];
+    if (!row || row.every((c) => c === null || String(c).trim() === '')) continue;
+    const floor = Math.round(toNum(row[col.floor!]));
+    const rooms = Math.round(toNum(row[col.rooms!]));
+    const area = toNum(row[col.area!]);
+    if (!(floor >= 1 && floor <= 60) || !(rooms >= 1 && rooms <= 9) || !(area > 10 && area < 1000)) {
+      errors.push(`${r + 1}-qator o'tkazib yuborildi`);
+      continue;
+    }
+    const pr = col.price !== undefined ? toNum(row[col.price]) : NaN;
+    rows.push({
+      block: col.block !== undefined ? String(row[col.block] ?? '').trim().replace(/\s*(blok|блок)\s*/i, '').slice(0, 20) || 'A' : 'A',
+      floor, rooms, area: round1(area),
+      number: col.number !== undefined ? String(row[col.number] ?? '').trim().slice(0, 12) : '',
+      price: pr > 0 ? Math.round(pr < 100000 ? pr * 1_000_000 : pr) : null,
+      status: col.status !== undefined ? parseStatus(row[col.status]) : null,
+      line: r + 1,
+    });
+  }
+  return { rows, errors: errors.slice(0, 20), columns };
 }

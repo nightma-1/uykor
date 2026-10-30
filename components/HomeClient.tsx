@@ -162,6 +162,7 @@ export default function HomeClient({ lang, complexes }: { lang: Lang; complexes:
                     <span className="muted" style={{ fontSize: 13 }}>{mln(c.price_m2, 1)} {t('mln/m²')}</span>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {c.shx_free != null && <span className="chip turq">{t('3D · {n} ta xonadon sotuvda', { n: c.shx_free })}</span>}
                     {c.installment_months > 0 && <span className="chip blue">{t("{n} oygacha bo'lib to'lash", { n: c.installment_months })}</span>}
                     {c.kadastr_status === 'bor' ? <span className="chip ok">{t('Kadastr chiqqan')}</span> : <span className="chip warn">{t('Kadastr jarayonda')}</span>}
                     <span className="chip gray">{dueLabel(c, lang)}</span>
