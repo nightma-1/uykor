@@ -1,6 +1,6 @@
 import { publicClient } from './supabase';
 import { DEVELOPER_COLS } from './contact';
-import type { ComplexWithDev, Developer, Complex, UnitType } from './types';
+import type { ComplexWithDev, Developer, Complex, Stock, UnitType } from './types';
 
 export async function getDevelopers(): Promise<Developer[]> {
   const sb = publicClient();
@@ -14,10 +14,14 @@ export async function getComplexes(): Promise<ComplexWithDev[]> {
   const [{ data: cx, error }, devs, { data: shx }] = await Promise.all([
     sb.from('complexes').select('*, unit_types(*)').eq('published', true),
     getDevelopers(),
-    sb.from('apartments').select('complex_id, status').limit(20000),
+    sb.from('complex_stock').select('complex_id, free, min_price, by_rooms, updated_at'),
   ]);
-  const free = new Map<string, number>();
-  for (const a of shx || []) free.set(a.complex_id, (free.get(a.complex_id) ?? 0) + (a.status === 'sotuvda' ? 1 : 0));
+  const stock = new Map<string, Stock>();
+  for (const s of (shx || []) as Record<string, unknown>[]) {
+    const by: Record<string, number> = {};
+    for (const [k, v] of Object.entries((s.by_rooms as Record<string, unknown>) || {})) by[k] = Number(v);
+    stock.set(String(s.complex_id), { free: Number(s.free) || 0, min_price: s.min_price == null ? null : Number(s.min_price), by_rooms: by, updated_at: (s.updated_at as string) ?? null });
+  }
   if (error) throw new Error(error.message);
   const byId = new Map(devs.map((d) => [d.id, d]));
   return ((cx || []) as (Complex & { unit_types: UnitType[] })[])
@@ -26,7 +30,8 @@ export async function getComplexes(): Promise<ComplexWithDev[]> {
       return {
         ...c,
         unit_types: [...(c.unit_types || [])].sort((a, b) => a.rooms - b.rooms),
-        shx_free: free.has(c.id) ? free.get(c.id)! : null,
+        shx_free: stock.has(c.id) ? stock.get(c.id)!.free : null,
+        stock: stock.get(c.id) ?? null,
         developer: { slug: d?.slug ?? '', name: d?.name ?? '', initials: d?.initials ?? '', rating: d?.rating ?? 0 },
       };
     })

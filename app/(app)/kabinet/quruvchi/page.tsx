@@ -7,7 +7,7 @@ import { requireUser } from '@/lib/supabase-server';
 import { getLang } from '@/lib/i18n-server';
 import { locale, T, tMsg } from '@/lib/i18n';
 import { som } from '@/lib/format';
-import { submitClaim, saveCompany, setLeadStatus } from './actions';
+import { submitClaim, saveCompany, setLeadStatus, confirmStock } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +33,7 @@ export default async function DeveloperCabinet({ searchParams }: { searchParams:
   const notices = (
     <>
       {sp.saqlandi && <div className="success">{t('Saqlandi.')}</div>}
+      {sp.ok === 'dolzarb' && <div className="success">{t("Rahmat! Xaridorlar endi ma'lumot bugun yangilanganini ko'radi.")}</div>}
       {sp.yuborildi && <div className="success">{t("Arizangiz yuborildi. Uykor siz bilan bog'lanib, kompaniyangizni tekshiradi.")}</div>}
       {sp.xato && <div className="error" role="alert">{tMsg(t, sp.xato)}</div>}
     </>
@@ -93,6 +94,10 @@ export default async function DeveloperCabinet({ searchParams }: { searchParams:
   const devIds = devs.map((d) => d.id);
   const { data: complexes } = await sb.from('complexes').select('id, name, slug, district, price_m2, published, progress, developer_id').in('developer_id', devIds).order('created_at', { ascending: false });
   const cids = (complexes || []).map((c) => c.id);
+  const { data: stockRows } = cids.length ? await sb.from('complex_stock').select('complex_id, free, total, updated_at').in('complex_id', cids) : { data: [] };
+  const stock = new Map((stockRows || []).map((s) => [s.complex_id as string, s as { free: number; total: number; updated_at: string | null }]));
+  const ageDays = (iso: string | null | undefined) => (iso ? Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)) : null);
+  const stale = (complexes || []).filter((c) => { const s = stock.get(c.id); const d = ageDays(s?.updated_at); return s && s.total > 0 && d != null && d > 7; });
   type LeadRow = { id: string; name: string; phone: string; kind: string; status: string; created_at: string; complex_id: string; apartment: { number: string; floor: number; rooms: number; area: number; block: { name: string } | null } | null };
   const { data: leadsRaw } = cids.length
     ? await sb.from('leads').select('id, name, phone, kind, status, created_at, complex_id, apartment:apartments(number, floor, rooms, area, block:complex_blocks(name))').in('complex_id', cids).order('created_at', { ascending: false }).limit(100)
@@ -111,6 +116,13 @@ export default async function DeveloperCabinet({ searchParams }: { searchParams:
           <Link href="/kabinet/quruvchi/majmua/yangi" className="btn">{t('+ Yangi majmua')}</Link>
         </div>
         {notices}
+        {stale.length > 0 && (
+          <div className="notice" role="status">
+            <span>
+              {t("Xaridorlar narx va holatlarni yangilangan sanasiga qarab ishonadi. {n} ta majmuada ma'lumot bir haftadan ko'proq yangilanmagan: sotilganlarini belgilang yoki o'zgarish bo'lmasa \"Hammasi dolzarb\" ni bosing.", { n: stale.length })}
+            </span>
+          </div>
+        )}
         {!tgUser && (
           <div className="notice">
             <span>{t("Yangi arizalarni Telegram'da darhol olish uchun \"Telegram orqali kirish\" bilan ham kiring va o'sha hisobdan shu kompaniyaga ulanish arizasini yuboring. Har bir xodim alohida ulanishi mumkin.")}</span>
@@ -155,15 +167,33 @@ export default async function DeveloperCabinet({ searchParams }: { searchParams:
               <Link href="/kabinet/quruvchi/majmua/yangi" className="btn small">{t("Birinchi majmuani qo'shish")}</Link>
             </div>
           )}
-          {(complexes || []).map((c) => (
-            <Link key={c.id} href={`/kabinet/quruvchi/majmua/${c.id}`} className="card" style={{ padding: 16, display: 'flex', flexWrap: 'wrap', gap: '6px 16px', alignItems: 'center', textDecoration: 'none', color: 'var(--ink)' }}>
-              <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <strong>{c.name}</strong>
-                <span className="muted" style={{ fontSize: 13 }}>{[c.district, `${som(c.price_m2)} ${t("so'm")}/m²`, t('Qurilish {n}%', { n: c.progress })].filter(Boolean).join(' · ')}</span>
+          {(complexes || []).map((c) => {
+            const s = stock.get(c.id);
+            const d = ageDays(s?.updated_at);
+            return (
+              <div key={c.id} className="card" style={{ padding: 16, display: 'flex', flexWrap: 'wrap', gap: '8px 16px', alignItems: 'center' }}>
+                <Link href={`/kabinet/quruvchi/majmua/${c.id}`} style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, textDecoration: 'none', color: 'var(--ink)' }}>
+                  <strong>{c.name}</strong>
+                  <span className="muted" style={{ fontSize: 13 }}>{[c.district, `${som(c.price_m2)} ${t("so'm")}/m²`, t('Qurilish {n}%', { n: c.progress })].filter(Boolean).join(' · ')}</span>
+                  {s && s.total > 0 && (
+                    <span style={{ fontSize: 13 }}>
+                      {t('{f} / {n} ta xonadon sotuvda', { f: s.free, n: s.total })} · <span style={{ color: d != null && d > 7 ? 'var(--danger)' : 'var(--muted)' }}>{d === 0 ? t('Bugun yangilangan') : t('{n} kun oldin yangilangan', { n: d ?? 0 })}</span>
+                    </span>
+                  )}
+                </Link>
+                <span className={`chip ${c.published ? 'ok' : 'warn'}`}>{c.published ? t('Saytda') : t('Tekshiruvda')}</span>
+                {s && s.total > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <Link href={`/kabinet/quruvchi/majmua/${c.id}/xonadonlar`} className="btn ghost small">{t('Holatlarni yangilash')}</Link>
+                    <form action={confirmStock}>
+                      <input type="hidden" name="id" value={c.id} />
+                      <button type="submit" className="btn small">{t('✓ Hammasi dolzarb')}</button>
+                    </form>
+                  </div>
+                )}
               </div>
-              <span className={`chip ${c.published ? 'ok' : 'warn'}`}>{c.published ? t('Saytda') : t('Tekshiruvda')}</span>
-            </Link>
-          ))}
+            );
+          })}
         </section>
 
         {devs.map((d) => (

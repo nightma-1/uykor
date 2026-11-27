@@ -493,6 +493,21 @@ function PlanEditor({ t, block, plan, busy, bucket, folder, onChange, onSave, on
     return () => window.removeEventListener('keydown', k);
   });
 
+  const [unitUp, setUnitUp] = useState<'idle' | 'busy' | 'error'>('idle');
+  async function pickUnitImage(e: React.ChangeEvent<HTMLInputElement>, key: string) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setUnitUp('busy');
+    try {
+      const url = await upload(f, bucket, folder, 1800);
+      // Bir xil turdagi (maydoni va xonalari teng) xonadonlarga ham qo'yiladi.
+      const src = plan.units.find((u) => u.key === key);
+      setUnits(plan.units.map((u) => (u.key === key || (src && !u.image && u.rooms === src.rooms && Math.abs(u.area - src.area) < 0.05) ? { ...u, image: url } : u)));
+      setUnitUp('idle');
+    } catch { setUnitUp('error'); }
+  }
+
   async function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = '';
@@ -641,6 +656,19 @@ function PlanEditor({ t, block, plan, busy, bucket, folder, onChange, onSave, on
                   <button type="button" className="btn ghost small" onClick={() => autoSplit(unit)}>{t("Avtomatik bo'lish")}</button>
                 </div>
                 <span className="muted" style={{ fontSize: 12 }}>{t("Xonalar 3D da devor, eshik, deraza va mebel bilan quriladi.")}</span>
+              </div>
+              <div className="field">
+                <span className="label">{t('Planirovka rasmi')}</span>
+                {unit.image && <img src={unit.image} alt="" style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--line)', alignSelf: 'flex-start' }} />}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <label className="btn ghost small" style={{ position: 'relative' }}>
+                    {unitUp === 'busy' ? t('Yuklanmoqda…') : unit.image ? t('Rasmni almashtirish') : t('Rasm yuklash')}
+                    <input type="file" accept="image/*" disabled={unitUp === 'busy'} onChange={(e) => pickUnitImage(e, unit.key)} style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} />
+                  </label>
+                  {unit.image && <button type="button" className="btn ghost small" onClick={() => patchUnit(unit.key, { image: undefined })}>{t("Rasmni olib tashlash")}</button>}
+                </div>
+                {unitUp === 'error' && <span className="error" role="alert">{t("Rasmni yuklab bo'lmadi")}</span>}
+                <span className="muted" style={{ fontSize: 12 }}>{t("Sizdagi chiroyli planirovka rasmi xaridorga xonadon kartasida ko'rsatiladi. Shu maydondagi boshqa xonadonlarga ham avtomatik qo'yiladi.")}</span>
               </div>
               <button type="button" className="btn ghost small" style={{ color: 'var(--danger)', alignSelf: 'flex-start' }} onClick={() => { setUnits(plan.units.filter((u) => u.key !== unit.key)); setSel(null); }}>{t("Xonadonni o'chirish")}</button>
             </>

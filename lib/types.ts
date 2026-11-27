@@ -35,6 +35,7 @@ export type UnitType = {
 
 export type Complex = {
   id: string;
+  stock_checked_at?: string | null;
   slug: string;
   developer_id: string;
   name: string;
@@ -69,4 +70,8 @@ export type ComplexWithDev = Complex & {
   unit_types: UnitType[];
   /** Shaxmatka bo'lsa — sotuvdagi xonadonlar soni (3D tanlash bor). */
   shx_free?: number | null;
+  /** Shaxmatkadagi haqiqiy zaxira: sotuvdagi xonadonlar, xonalar bo'yicha eng arzon narx, oxirgi yangilanish. */
+  stock?: Stock | null;
 };
+
+export type Stock = { free: number; min_price: number | null; by_rooms: Record<string, number>; updated_at: string | null };

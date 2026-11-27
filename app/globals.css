@@ -184,3 +184,16 @@ table.t td { padding: 10px; border-bottom: 1px solid #EEF0F4; vertical-align: to
 .fav-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .jk-card h2 { padding-right: 40px; }
 .master-card > div:first-of-type { padding-right: 40px; }
+
+/* Majmua sahifasi: telefonda pastki aloqa paneli */
+.jk-bar { display: none; }
+@media (max-width: 899px) {
+  .jk-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; display: flex; align-items: center; gap: 8px; padding: 10px max(12px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(20, 33, 61, 0.08); }
+  .jk-bar > div { display: flex; flex-direction: column; margin-right: auto; line-height: 1.15; min-width: 0; }
+  .jk-bar > div span { font-size: 11px; }
+  .jk-bar > div b { font-size: 15px; white-space: nowrap; }
+  .jk-bar .btn { min-height: 44px; padding: 0 14px; }
+  body:has(.jk-bar) { padding-bottom: 76px; }
+  body:has(.shx-stage.walking) .jk-bar { display: none; }
+}
+@media (max-width: 899px) { body:has(.jk-bar) .shx-compare { bottom: 84px; } }

@@ -10,6 +10,7 @@ import { useCompare } from '@/lib/compare-client';
 import FacadeView from './FacadeView';
 import FloorPlanSvg, { statusText } from './FloorPlanSvg';
 import ApartmentCard, { type CardComplex } from './ApartmentCard';
+import ChessTable from './ChessTable';
 import type { Mode3D } from './Building3D';
 import '@/app/shaxmatka.css';
 
@@ -18,13 +19,23 @@ const Building3D = dynamic(() => import('./Building3D'), {
   loading: () => <div className="shx3d shx3d-loading"><span>3D…</span></div>,
 });
 
-type Props = { lang: Lang; complex: CardComplex; data: Data };
+type Props = { lang: Lang; complex: CardComplex; data: Data; checkedAt?: string | null };
+type View = 'jadval' | 'fasad' | '3d';
+
+/** Holatlar oxirgi marta qachon yangilangani (xonadon o'zgarishi yoki quruvchi tasdig'i). */
+export function freshness(apartments: Apartment[], checkedAt?: string | null): { days: number; date: string } | null {
+  let ts = checkedAt ? Date.parse(checkedAt) : 0;
+  for (const a of apartments) if (a.updated_at) ts = Math.max(ts, Date.parse(a.updated_at));
+  if (!ts) return null;
+  return { days: Math.max(0, Math.floor((Date.now() - ts) / 86_400_000)), date: new Date(ts).toISOString().slice(0, 10) };
+}
 type RoomsFilter = 0 | 1 | 2 | 3 | 4;
 
-export default function Shaxmatka({ lang, complex, data }: Props) {
+export default function Shaxmatka({ lang, complex, data, checkedAt }: Props) {
   const t = T(lang);
   const { blocks, plans, apartments } = data;
-  const [view, setView] = useState<'fasad' | '3d'>('fasad');
+  const [view, setView] = useState<View>('jadval');
+  const [fresh, setFresh] = useState<{ days: number; date: string } | null>(null);
   const [blockId, setBlockId] = useState(blocks[0]?.id ?? '');
   const [floor, setFloor] = useState<number | null>(null);
   const [aptId, setAptId] = useState<string | null>(null);
@@ -81,7 +92,9 @@ export default function Shaxmatka({ lang, complex, data }: Props) {
       const a = apartments.find((x) => x.block_id === b.id && x.floor === f && x.number === sp.get('xonadon'));
       if (a) setAptId(a.id);
     }
-    if (sp.get('korinish') === '3d' || (sp.get('korinish') !== 'fasad' && window.matchMedia('(min-width: 900px)').matches)) setView('3d');
+    const k = sp.get('korinish');
+    if (k === '3d' || k === 'fasad') setView(k);
+    setFresh(freshness(apartments, checkedAt));
     if (sp.get('blok') || sp.get('qavat')) document.getElementById('xonadonlar')?.scrollIntoView({ block: 'start' });
     ready.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,10 +148,17 @@ export default function Shaxmatka({ lang, complex, data }: Props) {
           <h2 className="h2" id="shx-title">{t('Xonadon tanlash')}</h2>
           <span className="muted" style={{ fontSize: 14 }}>
             {t('{n} ta xonadon sotuvda', { n: freeAll.length })}{minFree ? ` · ${t("{n} mln so'mdan", { n: mln(minFree) })}` : ''}
-            {(rooms || onlyFree || maxPrice) ? <b style={{ color: 'var(--ink)' }}> · {t('{n} ta mos', { n: matches.length })}</b> : ` · ${t('holati quruvchi tomonidan yangilanadi')}`}
+            {(rooms || onlyFree || maxPrice) ? <b style={{ color: 'var(--ink)' }}> · {t('{n} ta mos', { n: matches.length })}</b> : null}
           </span>
+          {fresh && (
+            <div className="shx-fresh" title={fresh.date}>
+              <i style={{ background: fresh.days <= 7 ? STATUS_COLOR.sotuvda : fresh.days <= 30 ? STATUS_COLOR.bron : '#C0392B' }} aria-hidden="true" />
+              {fresh.days === 0 ? t('Narx va holatlar bugun yangilangan') : t('Narx va holatlar {n} kun oldin yangilangan', { n: fresh.days })}
+            </div>
+          )}
         </div>
         <div className="seg shx-view" role="group" aria-label={t("Ko'rinish")}>
+          <button type="button" aria-pressed={view === 'jadval'} onClick={() => { setView('jadval'); setWalk(false); }}>{t('Shaxmatka')}</button>
           <button type="button" aria-pressed={view === 'fasad'} onClick={() => { setView('fasad'); setWalk(false); }}>{t('Fasad')}</button>
           <button type="button" aria-pressed={view === '3d'} onClick={() => setView('3d')}>3D</button>
         </div>
@@ -169,8 +189,19 @@ export default function Shaxmatka({ lang, complex, data }: Props) {
       </div>
 
       <div className="shx-body">
-        <div className={`shx-stage${walk ? ' walking' : ''}`}>
-          {view === '3d' ? (
+        <div className={`shx-stage${walk ? ' walking' : ''}${view === 'jadval' ? ' chess' : ''}`}>
+          {view === 'jadval' ? (
+            <ChessTable
+              t={t}
+              block={block}
+              apartments={blockApts}
+              priceM2={complex.price_m2}
+              selApt={aptId}
+              selFloor={floor}
+              isDimmed={isDimmed}
+              onPick={(a) => { setBlockId(a.block_id); setFloor(a.floor); setWalk(false); pickApt(a.id); }}
+            />
+          ) : view === '3d' ? (
             <>
               <Building3D
                 key={light ? 'yengil' : 'toliq'}
@@ -265,8 +296,8 @@ export default function Shaxmatka({ lang, complex, data }: Props) {
             <p className="muted">{t("Bu qavat planirovkasi hali kiritilmagan.")}</p>
           ) : (
             <div className="shx-empty">
-              <strong>{t('Qavatni tanlang')}</strong>
-              <span className="muted">{t("Binoda yoki ro'yxatda qavatni bosing: planirovka, narxlar va bo'sh xonadonlar ochiladi.")}</span>
+              <strong>{view === 'jadval' ? t('Xonadonni tanlang') : t('Qavatni tanlang')}</strong>
+              <span className="muted">{view === 'jadval' ? t("Jadvalda katakni bosing: narx, planirovka va bo'lib to'lash hisobi ochiladi. Kataklarda: xonalar, m², narx (mln so'm).") : t("Binoda yoki ro'yxatda qavatni bosing: planirovka, narxlar va bo'sh xonadonlar ochiladi.")}</span>
               <Legend t={t} />
             </div>
           )}

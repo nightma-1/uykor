@@ -47,6 +47,7 @@ export default function ApartmentCard({ lang, complex, block, plan, apartment: a
   const [term, setTerm] = useState(terms[terms.length - 1] ?? 0);
   const [lead, setLead] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [zoom, setZoom] = useState(false);
   const cmp = useCompare();
 
   const windows = unit ? windowLabels(unit, block) : [];
@@ -99,6 +100,19 @@ export default function ApartmentCard({ lang, complex, block, plan, apartment: a
         {sun && sun.today.hours > 0 && <div><dt>{t('Bugun quyosh')}</dt><dd>{t('~{n} soat', { n: String(sun.today.hours).replace('.', ',') })} <span className="muted">({sun.today.from}–{sun.today.to})</span></dd></div>}
         {sun && <div><dt>{t('Qishda (21-dekabr)')}</dt><dd>{sun.winter.hours > 0 ? t('~{n} soat', { n: String(sun.winter.hours).replace('.', ',') }) : t("to'g'ri quyosh tushmaydi")}</dd></div>}
       </dl>
+
+      {unit?.image && (
+        <button type="button" className="shx-planimg" onClick={() => setZoom(true)} aria-label={t('Planirovkani kattalashtirish')}>
+          <img src={unit.image} alt={t('{n} xonali, {a} m² planirovkasi', { n: a.rooms, a: a.area })} loading="lazy" />
+          <span>{t('Quruvchi planirovkasi · kattalashtirish')}</span>
+        </button>
+      )}
+      {zoom && unit?.image && (
+        <div className="shx-zoom" role="dialog" aria-modal="true" aria-label={t('Planirovka')} onClick={() => setZoom(false)}>
+          <img src={unit.image} alt="" />
+          <button type="button" className="btn small" onClick={() => setZoom(false)}>{t('✕ Yopish')}</button>
+        </div>
+      )}
 
       {unit?.rooms_detail && unit.rooms_detail.length > 0 && (
         <div className="shx-rooms">

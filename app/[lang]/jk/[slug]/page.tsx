@@ -121,6 +121,7 @@ export default async function JkPage({ params }: Params) {
               <Shaxmatka
                 lang={lang}
                 data={shx}
+                checkedAt={c.stock_checked_at ?? null}
                 complex={{ id: c.id, slug: c.slug, name: c.name, lat: c.lat, lng: c.lng, price_m2: c.price_m2, installment_months: c.installment_months, first_payment_pct: c.first_payment_pct }}
               />
             )}
@@ -210,7 +211,7 @@ export default async function JkPage({ params }: Params) {
           </div>
 
           <aside>
-            <div className="card section" style={{ boxShadow: '0 6px 20px rgba(20,33,61,0.06)' }}>
+            <div className="card section" id="aloqa" style={{ boxShadow: '0 6px 20px rgba(20,33,61,0.06)', scrollMarginTop: 80 }}>
               <div>
                 <div className="muted" style={{ fontSize: 13 }}>{t('Narxi')}</div>
                 <div className="num" style={{ fontSize: 26, fontWeight: 700 }}>{t("{n} mln so'mdan", { n: mln(from) })}</div>
@@ -229,6 +230,11 @@ export default async function JkPage({ params }: Params) {
             <MiniMap lat={c.lat} lng={c.lng} label={c.name} lang={lang} />
           </aside>
         </div>
+      </div>
+      <div className="jk-bar" role="region" aria-label={t("Bog'lanish")}>
+        <div className="num"><span className="muted">{t('Narxi')}</span><b>{t("{n} mln so'mdan", { n: mln(from) })}</b></div>
+        {hasShx && <a href="#xonadonlar" className="btn ghost">{t('Xonadonlar')}</a>}
+        <a href="#aloqa" className="btn">{t("Bog'lanish")}</a>
       </div>
       <Footer lang={lang} />
     </>

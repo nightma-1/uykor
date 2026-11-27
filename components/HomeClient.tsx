@@ -12,10 +12,35 @@ const MapView = dynamic(() => import('./MapView'), { ssr: false, loading: () => 
 
 const ROOMS = ['Hammasi', '1', '2', '3', '4+'];
 
+const roomsOk = (n: number, want: string) => want === 'Hammasi' || (want === '4+' ? n >= 4 : n === Number(want));
+
+/** Tanlangan xonalar bo'yicha eng arzon variant: avval haqiqiy shaxmatka zaxirasi, bo'lmasa xonadon turlari. */
+export function cheapest(c: ComplexWithDev, want: string): number | null {
+  if (c.stock && c.stock.free > 0) {
+    const ps = Object.entries(c.stock.by_rooms).filter(([r]) => roomsOk(Number(r), want)).map(([, p]) => p);
+    return ps.length ? Math.min(...ps) : null;
+  }
+  if (c.stock && c.stock.free === 0) return null;
+  const ps = c.unit_types.filter((u) => roomsOk(u.rooms, want)).map((u) => u.price ?? u.area * c.price_m2);
+  if (ps.length) return Math.min(...ps);
+  return want === 'Hammasi' ? minPrice(c) : null;
+}
+
+/** Bo'lib to'lashda: boshlang'ich to'lov va eng uzun muddatdagi oylik. */
+export function payment(c: Pick<ComplexWithDev, 'installment_months' | 'first_payment_pct'>, price: number) {
+  if (!c.installment_months) return null;
+  const first = (price * c.first_payment_pct) / 100;
+  return { first, monthly: (price - first) / c.installment_months };
+}
+
+const num = (v: string) => parseFloat(v.replace(/\s/g, '').replace(',', '.'));
+
 export default function HomeClient({ lang, complexes }: { lang: Lang; complexes: ComplexWithDev[] }) {
   const t = T(lang);
   const [rooms, setRooms] = useState('Hammasi');
   const [maxM2, setMaxM2] = useState('');
+  const [budget, setBudget] = useState('');
+  const [monthly, setMonthly] = useState('');
   const [minInst, setMinInst] = useState('0');
   const [kadastr, setKadastr] = useState('any');
   const [due, setDue] = useState('any');
@@ -30,10 +55,14 @@ export default function HomeClient({ lang, complexes }: { lang: Lang; complexes:
 
   const list = useMemo(() => {
     const max = parseFloat(maxM2.replace(',', '.'));
+    const bud = num(budget), mon = num(monthly);
     const out = complexes.filter((c) => {
-      if (rooms !== 'Hammasi') {
-        const want = rooms === '4+' ? 4 : Number(rooms);
-        if (!c.unit_types.some((u) => (rooms === '4+' ? u.rooms >= 4 : u.rooms === want))) return false;
+      const low = cheapest(c, rooms);
+      if (rooms !== 'Hammasi' && low == null) return false;
+      if (!isNaN(bud) && (low == null || low / 1_000_000 > bud)) return false;
+      if (!isNaN(mon)) {
+        const pay = low == null ? null : payment(c, low);
+        if (!pay || pay.monthly / 1_000_000 > mon) return false;
       }
       if (!isNaN(max) && c.price_m2 / 1_000_000 > max) return false;
       if (c.installment_months < Number(minInst)) return false;
@@ -42,11 +71,11 @@ export default function HomeClient({ lang, complexes }: { lang: Lang; complexes:
       if (due !== 'any' && due !== 'done' && !(c.status === 'qurilmoqda' && c.promised_date?.startsWith(due))) return false;
       return true;
     });
-    if (sort === 'cheap') out.sort((a, b) => minPrice(a) - minPrice(b));
+    if (sort === 'cheap') out.sort((a, b) => (cheapest(a, rooms) ?? 9e15) - (cheapest(b, rooms) ?? 9e15));
     else if (sort === 'soon') out.sort((a, b) => (a.status === 'topshirilgan' ? '0' : a.promised_date || '9').localeCompare(b.status === 'topshirilgan' ? '0' : b.promised_date || '9'));
     else out.sort((a, b) => b.developer.rating - a.developer.rating);
     return out;
-  }, [complexes, rooms, maxM2, minInst, kadastr, due, sort]);
+  }, [complexes, rooms, maxM2, budget, monthly, minInst, kadastr, due, sort]);
 
   const points = useMemo(
     () => list.map((c) => ({ id: c.id, lat: c.lat, lng: c.lng, label: `${mln(c.price_m2, 1)} ${t('mln')}`, title: c.name })),
@@ -56,7 +85,7 @@ export default function HomeClient({ lang, complexes }: { lang: Lang; complexes:
   const sel = list.find((c) => c.id === selected);
 
   function reset() {
-    setRooms('Hammasi'); setMaxM2(''); setMinInst('0'); setKadastr('any'); setDue('any');
+    setRooms('Hammasi'); setMaxM2(''); setBudget(''); setMonthly(''); setMinInst('0'); setKadastr('any'); setDue('any');
   }
 
   function roomsLabel(c: ComplexWithDev) {
@@ -84,6 +113,14 @@ export default function HomeClient({ lang, complexes }: { lang: Lang; complexes:
                 <button key={r} type="button" aria-pressed={rooms === r} onClick={() => setRooms(r)}>{r === 'Hammasi' ? t('Hammasi') : r}</button>
               ))}
             </div>
+          </div>
+          <div className="field">
+            <label htmlFor="f-budget">{t("Byudjet, mln so'm gacha")}</label>
+            <input id="f-budget" className="input" inputMode="decimal" placeholder={t('masalan 600')} value={budget} onChange={(e) => setBudget(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="f-monthly">{t("Oyiga to'lay olaman, mln so'm")}</label>
+            <input id="f-monthly" className="input" inputMode="decimal" placeholder={t('masalan 15')} value={monthly} onChange={(e) => setMonthly(e.target.value)} />
           </div>
           <div className="field">
             <label htmlFor="f-price">{t("1 m² narxi, mln so'm gacha")}</label>
@@ -141,6 +178,9 @@ export default function HomeClient({ lang, complexes }: { lang: Lang; complexes:
 
           {list.map((c) => {
             const on = c.id === selected;
+            const low = cheapest(c, rooms) ?? minPrice(c);
+            const pay = payment(c, low);
+            const days = c.stock?.updated_at ? Math.max(0, Math.floor((Date.now() - Date.parse(c.stock.updated_at)) / 86_400_000)) : null;
             const href = lp(lang, `/jk/${c.slug}`);
             return (
               <article key={c.id} className={`card jk-card${on ? ' on' : ''}`} onClick={() => setSelected(c.id)}>
@@ -158,11 +198,17 @@ export default function HomeClient({ lang, complexes }: { lang: Lang; complexes:
                     <span className="rating num">★ {c.developer.rating.toFixed(1)}</span>
                   </div>
                   <div className="num" style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 18, fontWeight: 700 }}>{t("{n} mln so'mdan", { n: mln(minPrice(c)) })}</span>
+                    <span style={{ fontSize: 18, fontWeight: 700 }}>{t("{n} mln so'mdan", { n: mln(low) })}</span>
                     <span className="muted" style={{ fontSize: 13 }}>{mln(c.price_m2, 1)} {t('mln/m²')}</span>
                   </div>
+                  {pay && (
+                    <span className="num" style={{ fontSize: 13 }}>
+                      {t("Boshlang'ich {a} mln, keyin oyiga {b} mln so'mdan", { a: mln(pay.first), b: mln(pay.monthly, 1) })}
+                    </span>
+                  )}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {c.shx_free != null && <span className="chip turq">{t('3D · {n} ta xonadon sotuvda', { n: c.shx_free })}</span>}
+                    {days != null && <span className={`chip ${days <= 7 ? 'ok' : days <= 30 ? 'gray' : 'warn'}`}>{days === 0 ? t('Bugun yangilangan') : t('{n} kun oldin yangilangan', { n: days })}</span>}
+                    {c.shx_free != null && <span className="chip turq">{t('Shaxmatka · {n} ta xonadon sotuvda', { n: c.shx_free })}</span>}
                     {c.installment_months > 0 && <span className="chip blue">{t("{n} oygacha bo'lib to'lash", { n: c.installment_months })}</span>}
                     {c.kadastr_status === 'bor' ? <span className="chip ok">{t('Kadastr chiqqan')}</span> : <span className="chip warn">{t('Kadastr jarayonda')}</span>}
                     <span className="chip gray">{dueLabel(c, lang)}</span>
@@ -189,7 +235,7 @@ export default function HomeClient({ lang, complexes }: { lang: Lang; complexes:
                   <strong>{sel.name}</strong>
                   <span className="muted" style={{ fontSize: 13 }}>{sel.developer.name} · {t('reyting {n}', { n: sel.developer.rating.toFixed(1) })} · {dueLabel(sel, lang)}</span>
                 </div>
-                <strong className="num">{t("{n} mln so'mdan", { n: mln(minPrice(sel)) })}</strong>
+                <strong className="num">{t("{n} mln so'mdan", { n: mln(cheapest(sel, rooms) ?? minPrice(sel)) })}</strong>
                 <Link href={lp(lang, `/jk/${sel.slug}`)} className="btn small">{t('Majmuani ochish')}</Link>
               </div>
             )}

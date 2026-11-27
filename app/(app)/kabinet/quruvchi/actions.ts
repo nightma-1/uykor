@@ -61,6 +61,18 @@ export async function setLeadStatus(f: FormData) {
   revalidatePath(BASE);
 }
 
+/** "Hammasi dolzarb": holatlar o'zgarmagan bo'lsa ham xaridorga yangilangan sana ko'rinadi. */
+export async function confirmStock(f: FormData) {
+  const { sb } = await requireUser(BASE);
+  const cid = str(f, 'id');
+  const back = str(f, 'back') === 'xonadonlar' ? page(cid, '/xonadonlar') : BASE;
+  const { error } = await sb.rpc('confirm_stock', { cid });
+  if (error) redirect(`${back}?xato=${encodeURIComponent("Tasdiqlab bo'lmadi")}`);
+  refresh();
+  revalidatePath(BASE, 'layout');
+  redirect(`${back}?ok=dolzarb`);
+}
+
 export async function saveComplex(f: FormData) {
   const { sb } = await requireUser(BASE);
   const id = str(f, 'id');

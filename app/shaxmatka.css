@@ -141,3 +141,29 @@
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .two-col .main .shx-plan { max-height: min(62vh, 560px); }
+
+/* 2D shaxmatka (jadval) */
+.shx-stage.chess { height: auto; min-height: 0; max-height: min(74vh, 640px); background: var(--card); overflow: auto; }
+.shx-chess { overflow: auto; max-height: inherit; }
+.shx-chess table { border-collapse: separate; border-spacing: 4px; margin: 4px; }
+.shx-chess th { position: sticky; left: 0; z-index: 1; background: var(--card); font: 600 13px/1 inherit; color: var(--muted); min-width: 30px; text-align: right; padding-right: 6px; font-variant-numeric: tabular-nums; }
+.shx-chess tr.cur th { color: var(--lapis); }
+.shx-chess td { padding: 0; }
+.shx-chess button { display: grid; grid-template-rows: auto auto auto; justify-items: start; gap: 1px; width: 62px; min-height: 52px; padding: 5px 6px; border: 0; border-radius: 8px; cursor: pointer; text-align: left; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.shx-chess button .r { font-size: 12px; font-weight: 700; }
+.shx-chess button .a { font-size: 11px; opacity: 0.9; }
+.shx-chess button .p { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.shx-chess button.dim { opacity: 0.28; }
+.shx-chess button[aria-pressed='true'] { outline: 3px solid var(--ink); outline-offset: 1px; }
+.shx-chess button:focus-visible { outline: 3px solid var(--lapis); outline-offset: 1px; }
+.shx-chess-empty { color: var(--muted); font-size: 12px; padding: 0 8px !important; height: 30px; background: #F1F3F6; border-radius: 8px; }
+.shx-fresh { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.shx-fresh i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* Quruvchi planirovka rasmi */
+.shx-planimg { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: #FFFFFF; cursor: zoom-in; }
+.shx-planimg img { width: 100%; max-height: 320px; object-fit: contain; }
+.shx-planimg span { font-size: 12px; color: var(--muted); }
+.shx-zoom { position: fixed; inset: 0; z-index: 3000; background: rgba(10, 16, 30, 0.88); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.shx-zoom img { max-width: 100%; max-height: 100%; object-fit: contain; background: #FFFFFF; border-radius: 8px; }
+.shx-zoom .btn { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 12px; }

@@ -12,6 +12,8 @@ export type UnitDef = {
   /** Qo'lda kiritilgan oyna tomonlari (N, NE, E, SE, S, SW, W, NW). Bo'sh bo'lsa konturdan hisoblanadi. */
   windows?: string[];
   rooms_detail?: RoomDef[];
+  /** Quruvchining shu xonadon turi uchun planirovka rasmi (ixtiyoriy). */
+  image?: string;
 };
 
 export type Block = {
@@ -310,7 +312,8 @@ export function cleanUnits(raw: unknown): UnitDef[] {
           return rp.length >= 3 ? [{ name: String(r.name ?? '').slice(0, 30) || 'Xona', area: Number(r.area) > 0 ? round1(Number(r.area)) : round1(polyArea(rp)), poly: rp }] : [];
         })
       : [];
-    return [{ key, rooms, area, poly: pg, windows, rooms_detail }];
+    const image = typeof u.image === 'string' && /^https:\/\/[^\s"'<>]+$/.test(u.image) ? u.image.slice(0, 500) : undefined;
+    return [{ key, rooms, area, poly: pg, windows, rooms_detail, ...(image ? { image } : {}) }];
   });
 }
 
